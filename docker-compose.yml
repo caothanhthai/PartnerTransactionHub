@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # UI management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: PartnerTransactionHub.Api/Dockerfile
+    container_name: partner-transactions-api
+    ports:
+      - "5000:80"   # HTTP
+      # - "5001:443"  # HTTPS
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      # ASPNETCORE_URLS: "http://+;https://+"
+
+      # 🔐 HTTPS config
+      # ASPNETCORE_Kestrel__Certificates__Default__Password: "yourpassword"
+      # ASPNETCORE_Kestrel__Certificates__Default__Path: "/https/aspnetapp.pfx"
+
+      RabbitMq__Host: rabbitmq
+      RabbitMq__QueueName: partner-transactions
+
+    # volumes:
+    #   - ./https:/https:ro
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
